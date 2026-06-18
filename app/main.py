@@ -16,7 +16,6 @@ from .config import (
     CURRENCIES,
     CURRENCY_FLAGS,
     CURRENCY_LABELS,
-    DB_PATH,
     SCRAPE_API_KEY,
     SCRAPE_HOUR_LIST,
     STATIC_DIR,
@@ -120,7 +119,7 @@ def _safe_rates() -> list[RateLatest]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    logger.info("db ready at %s", DB_PATH)
+    logger.info("db ready")
     try:
         start_scheduler()
     except Exception as exc:  # noqa: BLE001
