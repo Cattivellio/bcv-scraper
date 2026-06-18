@@ -5,7 +5,7 @@ services:
     ports:
       - "8100:8100"
     volumes:
-      - ./data:/app/data
+      - /home/cattivellio/docker_data/bcv-scraper/data:/app/data
     environment:
       - TZ=America/Caracas
       - BCV_VERIFY_SSL=false
