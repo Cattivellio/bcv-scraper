@@ -4,9 +4,18 @@ services:
     container_name: bcv-scraper
     ports:
       - "8100:8100"
-    volumes:
-      - /home/cattivellio/docker_data/bcv-scraper/data:/app/data
     environment:
       - TZ=America/Caracas
       - BCV_VERIFY_SSL=false
+      - DB_HOST=postgres_central
+      - DB_PORT=5432
+      - DB_NAME=bcv_scraper
+      - DB_USER=admin_root
+      - DB_PASSWORD=cattivellio_master
+      - SCRAPE_API_KEY=bbClrnUU5qvvo9CUqUVoIBmTx15ETkV-z6r93TRsSVw
     restart: unless-stopped
+
+networks:
+  default:
+    name: red_central_db
+    external: true

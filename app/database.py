@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Iterator, Optional
 
-from .config import DB_PATH
+import psycopg2
+import psycopg2.extras
+from psycopg2.pool import ThreadedConnectionPool
+
+from .config import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
 
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS rates (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    id          SERIAL PRIMARY KEY,
     currency    TEXT    NOT NULL,
     value       REAL    NOT NULL,
     source_date TEXT    NOT NULL,
@@ -25,133 +27,152 @@ CREATE INDEX IF NOT EXISTS idx_rates_source_date
 """
 
 
-def _connect(path: Optional[Path] = None) -> sqlite3.Connection:
-    p = str(path or DB_PATH)
-    conn = sqlite3.connect(p, timeout=10, isolation_level=None, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA foreign_keys=ON;")
-    conn.executescript(SCHEMA)
-    return conn
+_pool: Optional[ThreadedConnectionPool] = None
+
+
+def _get_pool() -> ThreadedConnectionPool:
+    global _pool
+    if _pool is None:
+        _pool = ThreadedConnectionPool(
+            minconn=1,
+            maxconn=5,
+            host=DB_HOST,
+            port=DB_PORT,
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+        )
+    return _pool
 
 
 @contextmanager
-def get_conn() -> Iterator[sqlite3.Connection]:
-    conn = _connect()
+def get_conn() -> Iterator[psycopg2.extensions.connection]:
+    pool = _get_pool()
+    conn = pool.getconn()
     try:
+        conn.set_session(autocommit=True)
         yield conn
     finally:
-        conn.close()
+        pool.putconn(conn)
 
 
 def init_db() -> None:
-    """No-op kept for backwards-compat: schema is now bootstrapped on every
-    connection, so the table is always present (even if the file was deleted
-    under us between requests)."""
     with get_conn() as conn:
-        conn.executescript(SCHEMA)
+        with conn.cursor() as cur:
+            cur.execute(SCHEMA)
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
+def _row_to_dict(row: tuple, cur: psycopg2.extras.RealDictCursor) -> dict:
+    cols = [desc[0] for desc in cur.description]
+    return dict(zip(cols, row))
+
+
 def insert_if_changed(
     currency: str, value: float, source_date: str, scraped_at: str
 ) -> bool:
-    """Insert a new rate row only if the latest stored value+date differs.
-
-    Returns True if a new row was inserted, False if skipped.
-    """
     with get_conn() as conn:
-        row = conn.execute(
-            "SELECT value, source_date FROM rates WHERE currency = ? "
-            "ORDER BY scraped_at DESC, id DESC LIMIT 1",
-            (currency,),
-        ).fetchone()
-        if row and row["value"] == value and row["source_date"] == source_date:
-            return False
-        conn.execute(
-            "INSERT INTO rates(currency, value, source_date, scraped_at) "
-            "VALUES (?, ?, ?, ?)",
-            (currency, value, source_date, scraped_at),
-        )
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT value, source_date FROM rates WHERE currency = %s "
+                "ORDER BY scraped_at DESC, id DESC LIMIT 1",
+                (currency,),
+            )
+            row = cur.fetchone()
+            if row and row["value"] == value and row["source_date"] == source_date:
+                return False
+            cur.execute(
+                "INSERT INTO rates(currency, value, source_date, scraped_at) "
+                "VALUES (%s, %s, %s, %s)",
+                (currency, value, source_date, scraped_at),
+            )
         return True
 
 
 def get_latest(currency: str) -> Optional[dict]:
     with get_conn() as conn:
-        row = conn.execute(
-            "SELECT id, currency, value, source_date, scraped_at FROM rates "
-            "WHERE currency = ? ORDER BY scraped_at DESC, id DESC LIMIT 1",
-            (currency,),
-        ).fetchone()
-        return dict(row) if row else None
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT id, currency, value, source_date, scraped_at FROM rates "
+                "WHERE currency = %s ORDER BY scraped_at DESC, id DESC LIMIT 1",
+                (currency,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
 
 
 def get_previous(currency: str) -> Optional[dict]:
     with get_conn() as conn:
-        row = conn.execute(
-            "SELECT id, currency, value, source_date, scraped_at FROM rates "
-            "WHERE currency = ? ORDER BY scraped_at DESC, id DESC "
-            "LIMIT 1 OFFSET 1",
-            (currency,),
-        ).fetchone()
-        return dict(row) if row else None
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT id, currency, value, source_date, scraped_at FROM rates "
+                "WHERE currency = %s ORDER BY scraped_at DESC, id DESC "
+                "LIMIT 1 OFFSET 1",
+                (currency,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
 
 
 def get_history(currency: str, limit: int = 200) -> list[dict]:
     with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT id, currency, value, source_date, scraped_at FROM rates "
-            "WHERE currency = ? ORDER BY scraped_at DESC, id DESC LIMIT ?",
-            (currency, max(1, int(limit))),
-        ).fetchall()
-        return [dict(r) for r in rows]
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT id, currency, value, source_date, scraped_at FROM rates "
+                "WHERE currency = %s ORDER BY scraped_at DESC, id DESC LIMIT %s",
+                (currency, max(1, int(limit))),
+            )
+            return [dict(r) for r in cur.fetchall()]
 
 
 def get_sparkline(currency: str, limit: int = 30) -> list[float]:
     with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT value FROM rates WHERE currency = ? "
-            "ORDER BY scraped_at ASC, id ASC LIMIT ?",
-            (currency, max(1, int(limit))),
-        ).fetchall()
-        return [float(r["value"]) for r in rows]
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT value FROM rates WHERE currency = %s "
+                "ORDER BY scraped_at ASC, id ASC LIMIT %s",
+                (currency, max(1, int(limit))),
+            )
+            return [float(r["value"]) for r in cur.fetchall()]
 
 
 def get_all_changes(limit: int = 500) -> list[dict]:
-    """All rows where the value differs from the previous row of the same currency."""
     with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT r.id, r.currency, r.value, r.source_date, r.scraped_at "
-            "FROM rates r "
-            "WHERE r.id IN ("
-            "  SELECT r2.id FROM rates r2 "
-            "  LEFT JOIN rates p ON p.currency = r2.currency "
-            "    AND (p.scraped_at < r2.scraped_at "
-            "         OR (p.scraped_at = r2.scraped_at AND p.id < r2.id)) "
-            "  WHERE p.id IS NULL OR p.value != r2.value OR p.source_date != r2.source_date"
-            ") "
-            "ORDER BY r.scraped_at DESC, r.id DESC LIMIT ?",
-            (max(1, int(limit)),),
-        ).fetchall()
-        return [dict(r) for r in rows]
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT id, currency, value, source_date, scraped_at "
+                "FROM ("
+                "  SELECT id, currency, value, source_date, scraped_at,"
+                "    LAG(value) OVER (PARTITION BY currency ORDER BY scraped_at, id) AS prev_value,"
+                "    LAG(source_date) OVER (PARTITION BY currency ORDER BY scraped_at, id) AS prev_date"
+                "  FROM rates"
+                ") sub "
+                "WHERE prev_value IS NULL OR prev_value != value OR prev_date != source_date "
+                "ORDER BY scraped_at DESC, id DESC LIMIT %s",
+                (max(1, int(limit)),),
+            )
+            return [dict(r) for r in cur.fetchall()]
 
 
 def last_scraped_at() -> Optional[str]:
     with get_conn() as conn:
-        row = conn.execute(
-            "SELECT scraped_at FROM rates ORDER BY scraped_at DESC, id DESC LIMIT 1"
-        ).fetchone()
-        return row["scraped_at"] if row else None
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT scraped_at FROM rates ORDER BY scraped_at DESC, id DESC LIMIT 1"
+            )
+            row = cur.fetchone()
+            return row["scraped_at"] if row else None
 
 
 def is_healthy() -> bool:
     try:
         with get_conn() as conn:
-            conn.execute("SELECT 1").fetchone()
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
         return True
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
-

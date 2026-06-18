@@ -7,10 +7,6 @@ from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-DB_PATH = DATA_DIR / "bcv.db"
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 
@@ -55,3 +51,10 @@ CURRENCY_FLAGS = {
     "TRY": "₺",
     "RUB": "₽",
 }
+
+# PostgreSQL connection
+DB_HOST = os.environ.get("DB_HOST", "localhost")
+DB_PORT = int(os.environ.get("DB_PORT", "5432"))
+DB_NAME = os.environ.get("DB_NAME", "bcv_scraper")
+DB_USER = os.environ.get("DB_USER", "admin_root")
+DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
