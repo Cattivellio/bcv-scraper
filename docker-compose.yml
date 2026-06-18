@@ -17,5 +17,5 @@ services:
 
 networks:
   default:
-    name: red_central_db
+    name: postgree_red_central_db
     external: true
