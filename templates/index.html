@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="hero">
+  <h1>Tasas de referencia del BCV</h1>
+  <p>Seguimiento automático 6 veces al día. Solo se guarda un nuevo registro cuando hay un cambio real en la tasa.</p>
+</section>
+
+<div class="calculator card" id="calculator">
+  <h2 class="calc-title">Calculadora de divisas</h2>
+  <div class="calc-row">
+    <div class="calc-field">
+      <label for="calc-amount">Monto</label>
+      <input id="calc-amount" type="number" min="0.01" step="any" placeholder="1.00" value="1" />
+    </div>
+    <div class="calc-field">
+      <label for="calc-from">De</label>
+      <select id="calc-from">
+        {% for c in calc_currencies %}
+          <option value="{{ c.code }}" data-flag="{{ c.flag }}">{{ c.flag }} {{ c.code }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button id="calc-swap" class="btn-icon" type="button" aria-label="Invertir monedas" title="Invertir">⇄</button>
+    <div class="calc-field">
+      <label for="calc-to">A</label>
+      <select id="calc-to">
+        {% for c in calc_currencies %}
+          <option value="{{ c.code }}" data-flag="{{ c.flag }}" {% if c.code == 'VES' %}selected{% endif %}>{{ c.flag }} {{ c.code }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="calc-result" id="calc-result">
+    <span class="calc-result-label">Resultado</span>
+    <span class="calc-result-value" id="calc-result-value">—</span>
+    <span class="calc-result-meta" id="calc-result-meta"></span>
+  </div>
+</div>
+
+<div class="meta-bar">
+  <span class="meta-pill"><span class="dot"></span> Último scrape: <strong>{{ last_scraped_at or '—' }}</strong></span>
+  <span class="meta-pill">Próximo: <strong>{{ next_run or '—' }}</strong></span>
+  <span class="meta-pill">Horario: <strong>{{ hours|join('h, ') }}h</strong> ({{ tz }})</span>
+  <span class="meta-pill" style="margin-left:auto;">
+    <input id="scrape-key" type="password" placeholder="API key (opcional)" style="background:transparent;border:1px solid var(--border);color:var(--foreground);padding:.25rem .5rem;border-radius:6px;font-size:.75rem;width:160px;" />
+    <button id="scrape-btn" class="btn btn-ghost" type="button" style="padding:.25rem .55rem;font-size:.75rem;">Scrape manual</button>
+  </span>
+</div>
+
+{% if last_errors %}
+  <div class="banner" style="border-color: color-mix(in srgb, var(--neg) 35%, var(--border)); background: color-mix(in srgb, var(--neg) 8%, var(--card));">
+    <div>
+      <strong>⚠ El último scrape tuvo errores:</strong>
+      <ul style="margin: .3rem 0 0; padding-left: 1.2rem;">
+        {% for e in last_errors %}<li><code>{{ e }}</code></li>{% endfor %}
+      </ul>
+    </div>
+    <span style="color: var(--muted-foreground); font-size: .75rem; white-space: nowrap;">revisá <code>.env</code> o los logs</span>
+  </div>
+{% endif %}
+
+{% if rates %}
+  <div class="grid">
+    {% for r in rates %}
+      <article class="card" aria-label="Tarifa {{ r.currency }}">
+        <header class="card-head">
+          <div class="card-currency">
+            <span class="flag">{{ r.flag }}</span>
+            <div>
+              <div class="card-code">{{ r.currency }}</div>
+              <span class="card-label">{{ r.label }}</span>
+            </div>
+          </div>
+          <div class="card-spark" style="color: var(--muted-foreground); width: 100px; height: 32px;">
+            <svg data-spark='{{ r.history|tojson }}' viewBox="0 0 100 32" preserveAspectRatio="none" width="100" height="32" aria-hidden="true"></svg>
+          </div>
+        </header>
+
+        <div class="card-value" data-bcv-value="{{ r.value }}">{{ r.value }}</div>
+        <div class="card-sub">
+          <span>Bs por unidad</span>
+          {% if r.delta is none %}
+            <span class="delta flat">— sin histórico</span>
+          {% elif r.delta == 0 %}
+            <span class="delta flat">sin cambio</span>
+          {% elif r.delta > 0 %}
+            <span class="delta up" title="Subió">▲ {{ '%.4f'|format(r.delta) }} ({{ '%.3f'|format(r.delta_pct) }}%)</span>
+          {% else %}
+            <span class="delta down" title="Bajó">▼ {{ '%.4f'|format(-r.delta) }} ({{ '%.3f'|format(r.delta_pct) }}%)</span>
+          {% endif %}
+        </div>
+        <footer class="card-foot">
+          <span>Fecha valor: <strong>{{ r.source_date }}</strong></span>
+          <span>Scrape: {{ r.scraped_at }}</span>
+        </footer>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card">
+    <div class="empty">
+      <h3>Aún no hay datos</h3>
+      <p>El scraper corre automáticamente a las {{ hours|join(':00, ') }}:00 ({{ tz }}). También puedes disparar uno manual desde el botón de arriba si configuraste <code>SCRAPE_API_KEY</code>.</p>
+    </div>
+  </div>
+{% endif %}
+
+{% endblock %}

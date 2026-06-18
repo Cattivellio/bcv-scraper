@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="hero">
+  <h1>Historial de cambios</h1>
+  <p>Solo se almacenan las filas en las que hubo un cambio real respecto al registro anterior.</p>
+</section>
+
+<div class="toolbar">
+  <span style="color: var(--muted-foreground); font-size: 0.8rem; margin-right: 0.25rem;">Moneda:</span>
+  {% for c in currencies %}
+    <a class="chip {{ 'active' if c == currency else '' }}" href="/history?currency={{ c }}">{{ c }}</a>
+  {% endfor %}
+  <span style="margin-left:auto; color: var(--muted-foreground); font-size: 0.8rem;">{{ records|length }} registros</span>
+</div>
+
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Fecha valor (BCV)</th>
+        <th>Valor (Bs / unidad)</th>
+        <th>Registrado en</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if records %}
+        {% for r in records %}
+          <tr>
+            <td class="mono">{{ r.source_date }}</td>
+            <td class="mono num" data-bcv-value="{{ r.value }}">{{ r.value }}</td>
+            <td class="mono">{{ r.scraped_at }}</td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="3" class="empty">
+            <h3>Sin historial para {{ currency }}</h3>
+            <p>Aún no se ha registrado ningún cambio para esta moneda.</p>
+          </td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

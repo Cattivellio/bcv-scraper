@@ -1,0 +1,12 @@
+services:
+  bcv-scraper:
+    build: .
+    container_name: bcv-scraper
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TZ=America/Caracas
+      - BCV_VERIFY_SSL=false
+    restart: unless-stopped
