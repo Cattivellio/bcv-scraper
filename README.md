@@ -60,7 +60,8 @@ Copia `.env.example` a `.env` y ajusta lo que necesites:
 | `SCRAPE_API_KEY` | *(vacío)* | Si está vacío, `POST /api/scrape` queda deshabilitado. Si tiene valor, el endpoint exige el header `X-API-Key`. |
 | `BCV_URL` | `https://www.bcv.org.ve/` | Página a scrapear. |
 | `TZ` | `America/Caracas` | Timezone del scheduler. |
-| `SCRAPE_HOURS` | `0,4,8,12,16,20` | Horas (0-23) en que corre el scraper. |
+| `SCRAPE_HOURS` | `16,17,18` | Horas (0-23) en que corre el scraper. |
+| `SCRAPE_MINUTES` | `0,30` | Minutos (0-59) dentro de cada hora. Combinado con SCRAPE_HOURS, por defecto corre cada 30 min de 16:00 a 18:30. |
 | `BCV_HTTP_TIMEOUT` | `15` | Timeout de la request HTTP. |
 | `BCV_HOST` / `BCV_PORT` | `127.0.0.1` / `8000` | Bind del servidor. |
 

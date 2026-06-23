@@ -41,7 +41,7 @@
 <div class="meta-bar">
   <span class="meta-pill"><span class="dot"></span> Último scrape: <strong>{{ last_scraped_at or '—' }}</strong></span>
   <span class="meta-pill">Próximo: <strong>{{ next_run or '—' }}</strong></span>
-  <span class="meta-pill">Horario: <strong>{{ hours|join('h, ') }}h</strong> ({{ tz }})</span>
+  <span class="meta-pill">Horario: <strong>{{ schedule_times|join(', ') }}</strong> ({{ tz }})</span>
   <span class="meta-pill" style="margin-left:auto;">
     <input id="scrape-key" type="password" placeholder="API key (opcional)" style="background:transparent;border:1px solid var(--border);color:var(--foreground);padding:.25rem .5rem;border-radius:6px;font-size:.75rem;width:160px;" />
     <button id="scrape-btn" class="btn btn-ghost" type="button" style="padding:.25rem .55rem;font-size:.75rem;">Scrape manual</button>
@@ -101,7 +101,7 @@
   <div class="card">
     <div class="empty">
       <h3>Aún no hay datos</h3>
-      <p>El scraper corre automáticamente a las {{ hours|join(':00, ') }}:00 ({{ tz }}). También puedes disparar uno manual desde el botón de arriba si configuraste <code>SCRAPE_API_KEY</code>.</p>
+      <p>El scraper corre automáticamente a las {{ schedule_times|join(', ') }} ({{ tz }}). También puedes disparar uno manual desde el botón de arriba si configuraste <code>SCRAPE_API_KEY</code>.</p>
     </div>
   </div>
 {% endif %}

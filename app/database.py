@@ -75,21 +75,14 @@ def insert_if_changed(
     currency: str, value: float, source_date: str, scraped_at: str
 ) -> bool:
     with get_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                "SELECT value, source_date FROM rates WHERE currency = %s "
-                "ORDER BY scraped_at DESC, id DESC LIMIT 1",
-                (currency,),
-            )
-            row = cur.fetchone()
-            if row and row["value"] == value and row["source_date"] == source_date:
-                return False
+        with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO rates(currency, value, source_date, scraped_at) "
-                "VALUES (%s, %s, %s, %s)",
+                "VALUES (%s, %s, %s, %s) "
+                "ON CONFLICT (currency, source_date, value) DO NOTHING",
                 (currency, value, source_date, scraped_at),
             )
-        return True
+            return cur.rowcount > 0
 
 
 def get_latest(currency: str) -> Optional[dict]:

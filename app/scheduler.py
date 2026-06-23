@@ -8,7 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 
-from .config import SCRAPE_HOUR_LIST, SCRAPE_ON_STARTUP, TZ
+from .config import SCRAPE_HOUR_LIST, SCRAPE_MINUTE_LIST, SCRAPE_ON_STARTUP, TZ
 from .scraper import scrape_once
 
 
@@ -50,14 +50,15 @@ def start() -> AsyncIOScheduler:
     if state.instance is not None:
         return state.instance
 
-    hours_csv = ",".join(str(h) for h in SCRAPE_HOUR_LIST) or "0,4,8,12,16,20"
+    hours_csv = ",".join(str(h) for h in SCRAPE_HOUR_LIST) or "16,17,18"
+    minutes_csv = ",".join(str(m) for m in SCRAPE_MINUTE_LIST) or "0,30"
     sched = AsyncIOScheduler(timezone=TZ)
 
     sched.add_job(
         _job,
-        CronTrigger(hour=hours_csv, minute=0, timezone=TZ),
+        CronTrigger(hour=hours_csv, minute=minutes_csv, timezone=TZ),
         id="bcv-scrape-cron",
-        name=f"BCV scrape at hours {hours_csv}",
+        name=f"BCV scrape at hours {hours_csv} minutes {minutes_csv}",
         replace_existing=True,
         coalesce=True,
         max_instances=1,
@@ -80,7 +81,7 @@ def start() -> AsyncIOScheduler:
     state.instance = sched
     state.running = True
     state.next_run = _format_next(sched)
-    logger.info("scheduler started (hours=%s tz=%s)", hours_csv, TZ)
+    logger.info("scheduler started (hours=%s minutes=%s tz=%s)", hours_csv, minutes_csv, TZ)
     return sched
 
 

@@ -19,8 +19,10 @@ _SCRAPE_ON_STARTUP_RAW = os.environ.get("BCV_SCRAPE_ON_STARTUP", "true").strip()
 SCRAPE_ON_STARTUP = _SCRAPE_ON_STARTUP_RAW not in ("0", "false", "no", "off")
 
 TZ = os.environ.get("TZ", "America/Caracas")
-SCRAPE_HOURS = os.environ.get("SCRAPE_HOURS", "0,4,8,12,16,20")
+SCRAPE_HOURS = os.environ.get("SCRAPE_HOURS", "16,17,18")
 SCRAPE_HOUR_LIST = [int(h) for h in SCRAPE_HOURS.split(",") if h.strip().isdigit()]
+SCRAPE_MINUTES = os.environ.get("SCRAPE_MINUTES", "0,30")
+SCRAPE_MINUTE_LIST = [int(m) for m in SCRAPE_MINUTES.split(",") if m.strip().isdigit()]
 
 HTTP_TIMEOUT = float(os.environ.get("BCV_HTTP_TIMEOUT", "15"))
 HTTP_USER_AGENT = os.environ.get(

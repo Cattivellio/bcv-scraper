@@ -56,6 +56,7 @@ class SchedulerStatus(BaseModel):
     last_run: Optional[str] = None
     next_run: Optional[str] = None
     hours: list[int]
+    minutes: list[int]
     timezone: str
     last_errors: list[str] = Field(default_factory=list)
     last_inserted: int = 0

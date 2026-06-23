@@ -18,6 +18,7 @@ from .config import (
     CURRENCY_LABELS,
     SCRAPE_API_KEY,
     SCRAPE_HOUR_LIST,
+    SCRAPE_MINUTE_LIST,
     STATIC_DIR,
     TEMPLATES_DIR,
     TZ,
@@ -225,6 +226,7 @@ async def api_scheduler_status():
         last_run=sched_state.last_run,
         next_run=sched_state.next_run,
         hours=SCRAPE_HOUR_LIST,
+        minutes=SCRAPE_MINUTE_LIST,
         timezone=TZ,
         last_errors=errs,
         last_inserted=ins,
@@ -328,6 +330,11 @@ def _dashboard_context() -> dict:
     last_errors: list[str] = []
     if sched_state.last_summary and sched_state.last_summary.get("errors"):
         last_errors = list(sched_state.last_summary["errors"])
+    schedule_times = sorted(
+        f"{h:02d}:{m:02d}"
+        for h in SCRAPE_HOUR_LIST
+        for m in SCRAPE_MINUTE_LIST
+    )
     return {
         "rates": _safe_rates(),
         "last_scraped_at": last_scraped_at(),
@@ -335,6 +342,8 @@ def _dashboard_context() -> dict:
         "now": now_iso(),
         "next_run": sched_state.next_run,
         "hours": SCRAPE_HOUR_LIST,
+        "minutes": SCRAPE_MINUTE_LIST,
+        "schedule_times": schedule_times,
         "tz": TZ,
         "calc_currencies": CALC_CURRENCIES,
     }
